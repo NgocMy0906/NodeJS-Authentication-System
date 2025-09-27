@@ -14,15 +14,26 @@ import authrouter from "./routes/authRoutes.js"; // Importing authentication rou
 dotenv.config(); // Loading environment variables from .env file
 const app = express(); // Initializing express application
 
-//SESSION
+// SESSION - Improved configuration
 app.use(
-  session({
-    secret: "SecretKey",
-    resave: false,
-    saveUninitialized: true,
-    cookie: { secure: false },
-  })
+    session({
+        secret: process.env.SESSION_SECRET || "SecretKey", // Use env variable
+        resave: true, // Changed to true
+        saveUninitialized: true,
+        cookie: {
+            secure: false, // Set to true if using HTTPS
+            maxAge: 24 * 60 * 60 * 1000 // 24 hours
+        },
+        // store: // Consider using MongoDB store for production
+    })
 );
+
+// Add this after session middleware
+app.use((req, res, next) => {
+    console.log('Session ID:', req.sessionID);
+    console.log('Session data:', req.session);
+    next();
+});
 
 //MIDDLEWARE
 app.use(bodyParser.urlencoded({ extended: true }));
@@ -33,26 +44,32 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 passport.use(
-  new GoogleStrategy(
-    {
-      clientID: process.env.CLIENT_ID,
-      clientSecret: process.env.CLIENT_SECRET,
-      callbackURL:
-        "https://nodejs-authentication-system-l2pu.onrender.com/auth/google/callback",
-      scope: ["profile", "email"],
-    },
-    function (accessToken, refreshToken, profile, callback) {
-      callback(null, profile);
-    }
-  )
+    new GoogleStrategy({
+            clientID: process.env.CLIENT_ID,
+            clientSecret: process.env.CLIENT_SECRET,
+            callbackURL: process.env.GOOGLE_CALLBACK_URL || "http://localhost:3000/auth/google/callback",
+            scope: ["profile", "email"],
+        },
+        function(accessToken, refreshToken, profile, callback) {
+            callback(null, profile);
+        }
+    )
 );
 
 passport.serializeUser((user, done) => {
-  done(null, user);
+    done(null, user);
 });
 
 passport.deserializeUser((user, done) => {
-  done(null, user);
+    done(null, user);
+});
+
+app.use((req, res, next) => {
+    res.locals.studentInfo = {
+        id: '22636941',
+        name: 'Nguyễn Võ Ngọc My'
+    };
+    next();
 });
 
 // Set Templates
@@ -65,7 +82,7 @@ connectUsingMongoose();
 
 //ROUTES
 app.get("/", (req, res) => {
-  res.send("Hey Ninja ! Go to /user/signin for the login page.");
+    res.send("Hey Ninja ! Go to /user/signin for the login page.");
 });
 app.use("/user", router);
 app.use("/auth", authrouter);
@@ -73,5 +90,5 @@ app.use(express.static("public"));
 
 //LISTEN
 app.listen(process.env.PORT, () => {
-  console.log(`Server is running on port ${process.env.PORT}`);
+    console.log(`Server is running on port ${process.env.PORT}`);
 });
